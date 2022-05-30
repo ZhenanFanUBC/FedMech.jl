@@ -1,0 +1,7 @@
+name = "FedMech"
+uuid = "9abfa8b6-6b87-4f44-9476-9f86eb47ed29"
+authors = ["Zhenan Fan <zhenanf@cs.ubc.ca>"]
+version = "0.1.0"
+
+[deps]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
