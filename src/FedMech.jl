@@ -18,8 +18,8 @@ export getMetrics, r2_score
 export Client, update!, performance, get_predict
 export Server, select!, sendModel!, aggregate!, training!
 
-include("src/utils.jl")
-include("src/client.jl")
-include("src/server.jl")
+include("utils.jl")
+include("client.jl")
+include("server.jl")
 
 end
