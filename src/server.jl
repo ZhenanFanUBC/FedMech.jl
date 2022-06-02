@@ -21,21 +21,21 @@ end
 function sendModel!(s::Server)
     for i in s.selectedIndices
         c = s.clients[i]
-        for j = 1:length(params(s.W))
-            params(c.W)[j] .= deepcopy( params(s.W)[j] )
+        for j = 1:length(Flux.params(s.W))
+            Flux.params(c.W)[j] .= deepcopy( Flux.params(s.W)[j] )
         end
     end
 end
 
 function aggregate!(s::Server)
-    l = length(params(s.W))
+    l = length(Flux.params(s.W))
     for j = 1:l
-        fill!(params(s.W)[j], 0.0)
+        fill!(Flux.params(s.W)[j], 0.0)
     end
     for i in s.selectedIndices
         c = s.clients[i]
         for j = 1:l
-            params(s.W)[j] .+= (1/s.τ) * deepcopy( params(c.W)[j] )
+            Flux.params(s.W)[j] .+= (1/s.τ) * deepcopy( Flux.params(c.W)[j] )
         end
     end
 end
@@ -49,7 +49,7 @@ function training!(s::Server, T::Int64)
         sendModel!(s)
         # local update for selected clients
         lss = 0.0
-        Threads.@threads for i in s.selectedIndices
+        for i in s.selectedIndices
             c = s.clients[i]
             local_lss = update!(c)
             lss += local_lss

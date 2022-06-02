@@ -30,14 +30,15 @@ function load_data(filepath::String; indexed::Bool=false)
 end
 
 # split data into train and test
-function train_test_split(num::Int64, X::Matrix{Float64}, label::Vector{Float64}, p::Float64)
+function train_test_split(X::SparseMatrixCSC{Float64, Int64}, Y::Vector{Int64}, p::Float64)
+    num = size(X, 2)
     numTrain = Int(floor(p*num))
     perm = Random.randperm(num)
     trainIdx = perm[1:numTrain]
     testIdx = perm[numTrain+1:end]
-    Xtrain = X[:, trainIdx]; labelTrain = label[trainIdx]
-    Xtest = X[:, testIdx]; labelTest = label[testIdx]
-    return Xtrain, labelTrain, Xtest, labelTest
+    Xtrain = X[:, trainIdx]; Ytrain = Y[trainIdx]
+    Xtest = X[:, testIdx]; Ytest = Y[testIdx]
+    return Xtrain, Ytrain, Xtest, Ytest
 end
 
 # horizontally split data
@@ -55,7 +56,7 @@ function split_data(Xtrain::SparseMatrixCSC{Float64, Int64}, Ytrain::Vector{Int6
         end
         Xtrain_split[i] = Xtrain[:, ids]
         Ytrain_split[i] = Ytrain[ids]
-        t += num_features_client
+        t += num_data_client
     end
     return Xtrain_split, Ytrain_split
 end
@@ -197,9 +198,6 @@ function read_libsvm(filename::String)
             line = readline(f)
             info = split(line, " ")
             value = parse(Int64, info[1] )
-            if value < 0
-                value = Int64(2)
-            end
             y[numLine] = value
             ll = length(info)
             if line[end] == ' '
@@ -219,5 +217,89 @@ function read_libsvm(filename::String)
     end
     return sparse( J, I, V, m, n ), y
 end
+
+function splitDataByClass(X::SparseMatrixCSC{Float64, Int64}, Y::Vector{Int64}, num_clients::Int64, num_classes::Int64)
+    Random.seed!(1234)
+    Xsplit = Vector{ SparseMatrixCSC{Float64, Int64} }(undef, num_clients)
+    Ysplit = Vector{ Vector{Int64} }(undef, num_clients)
+    # assign 2 classes to each client 
+    classes_clients = Vector{Tuple{Int64, Int64}}(undef, num_clients)
+    for i in 1:num_clients
+        pair = samplepair(1:num_classes)
+        classes_clients[i] = pair
+    end
+    # clients in each class
+    clients_in_classes = [ [] for _ = 1:num_classes]
+    for i = 1:num_classes
+        for j = 1:num_clients
+            if (classes_clients[j][1] == i) || (classes_clients[j][2] == i)
+                push!(clients_in_classes[i], j)
+            end
+        end
+    end
+    # intialize indices
+    indices = [ [] for _ = 1:num_clients]
+    for i = 1:length(Y)
+        class = Y[i]
+        j = rand(clients_in_classes[class])
+        push!(indices[j], i)
+    end
+    # fill in
+    for i in 1:num_clients
+        ids = indices[i]
+        Xsplit[i] = copy( X[:,ids] )
+        Ysplit[i] = Y[ids]
+    end
+    return Xsplit, Ysplit
+end
+
+function buildPredModel(X::SparseMatrixCSC{Float64, Int64}, Yhot::Flux.OneHotArray, numClass::Int64)
+    Random.seed!(1234)
+    numFeatures = size(X, 1)
+    numSelectedFeatures = floor(Int, 0.3*numFeatures)
+    selectedFeatures = randperm(numFeatures)[1:numSelectedFeatures]
+    mask = zeros(numFeatures); mask[selectedFeatures] .= 1.0
+    model = Chain(Dense(numFeatures, numClass), softmax)
+    g(x) = model(x.*mask)
+    loss(x, y) = Flux.crossentropy( g(x) , y )
+    data = Flux.Data.DataLoader( (X, Yhot), 
+                                batchsize=25, 
+                                shuffle=true )
+    opt = ADAM()
+    for t = 1:10
+        Flux.train!(loss, Flux.params(model), data, opt)
+    end
+    return g
+end
+
+function buildRangeModel(X::SparseMatrixCSC{Float64, Int64}, Y::Vector{Int64}, numClass::Int64)
+    Random.seed!(1234)
+    DictData = Dict{SparseVector{Float64}, Vector{Float64}}()
+    numData = size(X, 2)
+    for i = 1:numData
+        v = -1e8*ones(numClass)
+        v[Y[i]] = 0.0
+        pair = samplepair(1:numClass)
+        v[pair[1]] = 0.0
+        v[pair[2]] = 0.0
+        DictData[X[:,i]] = v
+    end
+    function h(x::SparseVector{Float64, Int64})
+        if haskey(DictData, x) 
+            return DictData[x]
+        else
+            return zeros(numClass)
+        end
+    end
+    function h(x::SparseMatrixCSC{Float64, Int64})
+        num = size(x, 2)
+        out = map(i->h(x[:,i]), collect(1:num))
+        return hcat(out...)
+    end
+    return h
+end
+
+
+
 
 
