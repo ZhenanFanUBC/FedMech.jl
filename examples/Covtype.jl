@@ -28,7 +28,7 @@ server = Server(clients, τ)
 training!(server, 3)
 # check performance
 for i = 1:numClients
-    performace(clients[i])
+    performance(clients[i])
 end
 
 
