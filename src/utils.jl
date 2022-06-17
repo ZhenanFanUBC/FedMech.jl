@@ -218,21 +218,25 @@ function read_libsvm(filename::String)
     return sparse( J, I, V, m, n ), y
 end
 
-function splitDataByClass(X::SparseMatrixCSC{Float64, Int64}, Y::Vector{Int64}, num_clients::Int64, num_classes::Int64)
+function splitDataByClass(X::SparseMatrixCSC{Float64, Int64}, 
+                          Y::Vector{Int64}, 
+                          num_clients::Int64, 
+                          num_classes::Int64,
+                          num_classes_per_client::Int64)
     Random.seed!(1234)
     Xsplit = Vector{ SparseMatrixCSC{Float64, Int64} }(undef, num_clients)
     Ysplit = Vector{ Vector{Int64} }(undef, num_clients)
-    # assign 2 classes to each client 
-    classes_clients = Vector{Tuple{Int64, Int64}}(undef, num_clients)
+    # assign num_classes_per_client classes to each client 
+    classes_clients = Vector{Vector{Int64}}(undef, num_clients)
     for i in 1:num_clients
-        pair = samplepair(1:num_classes)
-        classes_clients[i] = pair
+        classes = sample(1:num_classes, num_classes_per_client, replace=false)
+        classes_clients[i] = classes
     end
     # clients in each class
     clients_in_classes = [ [] for _ = 1:num_classes]
     for i = 1:num_classes
         for j = 1:num_clients
-            if (classes_clients[j][1] == i) || (classes_clients[j][2] == i)
+            if i in classes_clients[j]
                 push!(clients_in_classes[i], j)
             end
         end
@@ -254,6 +258,7 @@ function splitDataByClass(X::SparseMatrixCSC{Float64, Int64}, Y::Vector{Int64}, 
 end
 
 function buildPredModel(X::SparseMatrixCSC{Float64, Int64}, Yhot::Flux.OneHotArray, numClass::Int64)
+    # logistic regression with limited features
     Random.seed!(1234)
     numFeatures = size(X, 1)
     numSelectedFeatures = floor(Int, 0.3*numFeatures)
@@ -272,16 +277,19 @@ function buildPredModel(X::SparseMatrixCSC{Float64, Int64}, Yhot::Flux.OneHotArr
     return g
 end
 
-function buildRangeModel(X::SparseMatrixCSC{Float64, Int64}, Y::Vector{Int64}, numClass::Int64)
+function buildRangeModel(X::SparseMatrixCSC{Float64, Int64}, 
+                         Y::Vector{Int64}, 
+                         numClass::Int64,
+                         numClassSub::Int64)
     Random.seed!(1234)
     DictData = Dict{SparseVector{Float64}, Vector{Float64}}()
     numData = size(X, 2)
+    classes = collect(Set(Y))
     for i = 1:numData
         v = -1e8*ones(numClass)
         v[Y[i]] = 0.0
-        pair = samplepair(1:numClass)
-        v[pair[1]] = 0.0
-        v[pair[2]] = 0.0
+        cs = sample( classes, numClassSub, replace=false )
+        v[cs] .= 0.0
         DictData[X[:,i]] = v
     end
     function h(x::SparseVector{Float64, Int64})

@@ -16,7 +16,7 @@ export label_transformation
 export mechanism1, mechanism2
 export buildPredModel, buildRangeModel
 export getMetrics, r2_score
-export Client, update!, performance
+export Client, ClientBase, update!, performance
 export Server, select!, sendModel!, aggregate!, training!
 
 include("utils.jl")
