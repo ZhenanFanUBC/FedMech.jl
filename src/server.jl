@@ -1,15 +1,15 @@
 mutable struct Server{  T1<:Flux.Chain, 
-                        T2<:Vector{Union{Client,ClientBase}},
+                        T2<:Vector{Union{Client,ClientBase,ClientImg}},
                         T3<:Vector{Int64},
                         T4<:Int64}
     W::T1                   # model
     clients::T2             # clients
     selectedIndices::T3     # indices of selected clients 
     τ::T4                   # number of selected cients
-    function Server(clients::Vector{Union{Client,ClientBase}}, τ::Int64)
+    function Server(clients::Vector{Union{Client,ClientBase,ClientImg}}, τ::Int64)
         W = deepcopy( clients[1].W )
         selectedIndices = Vector{Int64}(undef, τ)
-        new{Flux.Chain, Vector{Union{Client,ClientBase}}, Vector{Int64}, Int64}(W, clients, selectedIndices, τ)
+        new{Flux.Chain, Vector{Union{Client,ClientBase,ClientImg}}, Vector{Int64}, Int64}(W, clients, selectedIndices, τ)
     end
 end 
 

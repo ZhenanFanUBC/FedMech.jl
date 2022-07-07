@@ -87,7 +87,48 @@ mutable struct ClientBase{  T1<:Int64,
     end
 end
 
-function update!(c::Union{Client,ClientBase}, numEpoches::Int64=5, callback!::Function=identity)
+mutable struct ClientImg{T1<:Int64, 
+                         T2<:Float64, 
+                         T3<:Vector{T1}, 
+                         T4<:Array{Float64, 4},  
+                         T5<:Flux.OneHotArray, 
+                         T6<:Flux.Chain, 
+                         T7<:Function}
+    id::T1                  # client index
+    Xtrain::T4              # training data
+    Ytrain::T3              # training label
+    YtrainHot::T5           # transformed training label
+    Xtest::T4               # test data
+    Ytest::T3               # test label
+    W::T6                   # model                 
+    f::T7                   # model with mechanisms
+    function ClientImg(id::Int64,
+                       Xtrain::Array{Float64, 4},
+                       Ytrain::Vector{Int64},
+                       Xtest::Array{Float64, 4},
+                       Ytest::Vector{Int64},
+                       numClass::Int64,
+                       λ::Float64,
+                       p::Float64)           
+        # label transformation
+        YtrainHot = Flux.onehotbatch(Ytrain, 0:9)
+        # mechanism models
+        g = buildPredModelImg(Xtrain, YtrainHot)
+        h = buildRangeModelImg(cat(Xtrain,Xtest,dims=4), vcat(Ytrain,Ytest), numClass, 2)
+        # model
+        W = LeNet5()
+        # use only subset of training data
+        num = size(Xtrain, 4)
+        numTrain = Int(floor(p*num))
+        perm = Random.randperm(num)
+        Idx = perm[1:numTrain]
+        # model with mechanisms
+        f = x -> λ*NNlib.softmax( W(x) + h(x) ) + (1-λ)*g(x)
+        new{Int64, Float64, Vector{Int64}, Array{Float64, 4}, Flux.OneHotArray, Flux.Chain, Function}(id, Xtrain[:,:,:,Idx], Ytrain[Idx], YtrainHot[:,Idx], Xtest, Ytest, W, f)
+    end
+end
+
+function update!(c::Union{Client,ClientBase,ClientImg}, numEpoches::Int64=5, callback!::Function=identity)
     data = Flux.Data.DataLoader( (c.Xtrain, c.YtrainHot), batchsize=5, shuffle=true)
     loss(x, y) = Flux.crossentropy( c.f(x) , y )
     opt = ADAM()
@@ -107,6 +148,19 @@ function performance(c::Union{Client,ClientBase})
     for i = 1:numTest
         x = c.Xtest[:,i]
         pred = argmax(c.f(x))
+        if pred == c.Ytest[i]
+            count += 1
+        end
+    end
+    @printf "client: %d, test accuracy: %.2f\n" c.id count/numTest
+end
+
+function performance(c::ClientImg)
+    count = 0
+    numTest = size(c.Xtest, 4)
+    for i = 1:numTest
+        x = c.Xtest[:,:,:,i:i]
+        pred = argmax(c.f(x))[1]-1
         if pred == c.Ytest[i]
             count += 1
         end

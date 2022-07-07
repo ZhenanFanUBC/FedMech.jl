@@ -307,7 +307,133 @@ function buildRangeModel(X::SparseMatrixCSC{Float64, Int64},
     return h
 end
 
+function LeNet5(; imgsize=(28,28,1), nclasses=10) 
 
+    out_conv_size = (imgsize[1]÷4 - 3, imgsize[2]÷4 - 3, 16)
+    
+    return Chain(
+            Conv((5, 5), imgsize[end]=>6, relu),
+            MaxPool((2, 2)),
+            Conv((5, 5), 6=>16, relu),
+            MaxPool((2, 2)),
+            Flux.flatten,
+            Dense(prod(out_conv_size), 120, relu), 
+            Dense(120, 84, relu), 
+            Dense(84, nclasses)
+          )
+end
 
+function LeNet5small(; imgsize=(14,14,1), nclasses=10) 
+    
+    return Chain(
+            MaxPool((2, 2)),
+            Conv((5, 5), imgsize[end]=>6, relu),
+            Flux.flatten,
+            Dense(600, 120, relu), 
+            Dense(120, 84, relu), 
+            Dense(84, nclasses),
+            NNlib.softmax
+          )
+end
 
+function buildPredModelImg(X::Array{Float64, 4}, Yhot::Flux.OneHotArray)
+    model = LeNet5small()
+    loss(x, y) = Flux.crossentropy( model(x) , y )
+    data = Flux.Data.DataLoader( (X, Yhot), 
+                                batchsize=25, 
+                                shuffle=true )
+    opt = ADAM()
+    for t = 1:10
+        Flux.train!(loss, Flux.params(model), data, opt)
+    end
+    return model
+end           
+              
+function buildRangeModelImg(X::Array{Float64, 4}, 
+                            Y::Vector{Int64}, 
+                            numClass::Int64,
+                            numClassSub::Int64)
+    DictData = Dict{Matrix{Float64}, Vector{Float64}}()
+    numData = size(X, 4)
+    classes = collect(Set(Y))
+    for i = 1:numData
+        v = -1e8*ones(numClass)
+        v[Y[i]+1] = 0.0
+        cs = sample( classes, numClassSub, replace=false )
+        cs .+= 1
+        v[cs] .= 0.0
+        x = X[:,:,:,i:i]
+        DictData[MaxPool((2, 2))(x)[:,:,1,1]] = v
+    end
+    function h(x::Matrix{Float64})
+        if haskey(DictData, x) 
+            return DictData[x]
+        else
+            return zeros(numClass)
+        end
+    end
+    function h(x::Array{Float64, 4})
+        num = size(x, 4)
+        out = map(i->h( MaxPool((2, 2))(x[:,:,:,i:i])[:,:,1,1] ), collect(1:num))
+        return hcat(out...)
+    end
+    return h
+end
 
+function splitDataByClassImg(Xtrain::Array{Float64, 4}, 
+                             Ytrain::Vector{Int64},
+                             Xtest::Array{Float64, 4}, 
+                             Ytest::Vector{Int64}, 
+                             num_clients::Int64, 
+                             num_classes::Int64,
+                             num_classes_per_client::Int64)
+    Random.seed!(1234)
+    XtrainSplit = Vector{ Array{Float64, 4} }(undef, num_clients)
+    YtrainSplit = Vector{ Vector{Int64} }(undef, num_clients)
+    XtestSplit = Vector{ Array{Float64, 4} }(undef, num_clients)
+    YtestSplit = Vector{ Vector{Int64} }(undef, num_clients)
+    # assign num_classes_per_client classes to each client 
+    classes_clients = Vector{Vector{Int64}}(undef, num_clients)
+    for i in 1:num_clients
+        classes = sample(1:num_classes, num_classes_per_client, replace=false)
+        classes_clients[i] = classes
+    end
+    # clients in each class
+    clients_in_classes = [ [] for _ = 1:num_classes]
+    for i = 1:num_classes
+        for j = 1:num_clients
+            if i in classes_clients[j]
+                push!(clients_in_classes[i], j)
+            end
+        end
+    end
+    # intialize indices
+    trainIndices = [ [] for _ = 1:num_clients]
+    for i = 1:length(Ytrain)
+        class = Ytrain[i]+1
+        j = rand(clients_in_classes[class])
+        push!(trainIndices[j], i)
+    end
+    testIndices = [ [] for _ = 1:num_clients]
+    for i = 1:length(Ytest)
+        class = Ytest[i]+1
+        j = rand(clients_in_classes[class])
+        push!(testIndices[j], i)
+    end
+    # fill in
+    for i in 1:num_clients
+        ids1 = trainIndices[i]
+        ids2 = testIndices[i]
+        XtrainSplit[i] = copy( Xtrain[:,:,:,ids1] )
+        YtrainSplit[i] = Ytrain[ids1]
+        XtestSplit[i] = copy( Xtest[:,:,:,ids2] )
+        YtestSplit[i] = Ytest[ids2]
+    end
+    return XtrainSplit, YtrainSplit, XtestSplit, YtestSplit
+end
+
+                       
+               
+                     
+                     
+                     
