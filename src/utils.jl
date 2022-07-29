@@ -169,7 +169,7 @@ function getMetrics(predict::Vector{Float64}, label::Vector{Float64})
 end
 
 # read data from libsvm
-function read_libsvm(filename::String)
+function read_libsvm(filename::String, tag::String="classification")
     numLine = 0
     nnz = 0
     open(filename, "r") do f
@@ -189,7 +189,11 @@ function read_libsvm(filename::String)
     I = zeros(Int64, nnz)
     J = zeros(Int64, nnz)
     V = zeros(Float64, nnz)
-    y = zeros(Int64, n)
+    if tag == "classification"
+        y = zeros(Int64, n)
+    else
+        y = zeros(Float64, n)
+    end
     numLine = 0
     cc = 1
     open(filename, "r") do f
@@ -197,7 +201,11 @@ function read_libsvm(filename::String)
             numLine += 1
             line = readline(f)
             info = split(line, " ")
-            value = parse(Int64, info[1] )
+            if tag == "classification"
+                value = parse(Int64, info[1] )
+            else
+                value = parse(Float64, info[1] )
+            end
             y[numLine] = value
             ll = length(info)
             if line[end] == ' '
