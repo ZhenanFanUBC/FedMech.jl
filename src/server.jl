@@ -1,15 +1,15 @@
 mutable struct Server{  T1<:Flux.Chain, 
-                        T2<:Vector{Union{Client,ClientBase,ClientImg}},
+                        T2<:Vector{Union{Client,ClientImg}},
                         T3<:Vector{Int64},
                         T4<:Int64}
     W::T1                   # model
     clients::T2             # clients
     selectedIndices::T3     # indices of selected clients 
     τ::T4                   # number of selected cients
-    function Server(clients::Vector{Union{Client,ClientBase,ClientImg}}, τ::Int64)
+    function Server(clients::Vector{Union{Client,ClientImg}}, τ::Int64)
         W = deepcopy( clients[1].W )
         selectedIndices = Vector{Int64}(undef, τ)
-        new{Flux.Chain, Vector{Union{Client,ClientBase,ClientImg}}, Vector{Int64}, Int64}(W, clients, selectedIndices, τ)
+        new{Flux.Chain, Vector{Union{Client,ClientImg}}, Vector{Int64}, Int64}(W, clients, selectedIndices, τ)
     end
 end 
 
@@ -42,7 +42,7 @@ end
 
 function training!(s::Server, T::Int64)
     for t = 1:T
-        @printf "round: %d\n" t
+        # @printf "round: %d\n" t
         # select clients
         select!(s)
         # send global model to selected clients
@@ -54,7 +54,7 @@ function training!(s::Server, T::Int64)
             local_lss = update!(c)
             lss += local_lss
         end
-        @printf "global loss: %.2f\n" lss
+        # @printf "global loss: %.2f\n" lss
         # global aggregation
         aggregate!(s)
     end

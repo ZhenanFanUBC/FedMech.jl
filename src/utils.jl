@@ -2,33 +2,6 @@
 # Helper functions
 #########################################################
 
-# read data
-function load_data(filepath::String; indexed::Bool=false)
-    lines = readlines(filepath)
-    numData = length(lines) - 1
-    if indexed
-        numFeature = length( split(lines[2], ",") ) - 2
-    else
-        numFeature = length( split(lines[2], ",") ) - 1
-    end
-    X = zeros(Float64, numFeature, numData)
-    label = zeros(Float64, numData)
-    for i = 1:numData
-        line = lines[i+1]
-        info = split(line, ",")
-        for j = 1:numFeature
-            if indexed
-                val = parse(Float64, info[j+1])
-            else
-                val = parse(Float64, info[j])
-            end
-            X[j,i] = val
-        end
-        label[i] = parse(Float64, info[end])
-    end
-    return numData, X, label
-end
-
 # split data into train and test
 function train_test_split(X::SparseMatrixCSC{Float64, Int64}, Y::Vector{Int64}, p::Float64)
     num = size(X, 2)
@@ -61,7 +34,6 @@ function split_data(Xtrain::SparseMatrixCSC{Float64, Int64}, Ytrain::Vector{Int6
     return Xtrain_split, Ytrain_split
 end
 
-
 # label Transformation
 function label_transformation(Label::Vector{Float64}, minVal::Int64, maxVal::Int64)
     num = length(Label)
@@ -70,102 +42,6 @@ function label_transformation(Label::Vector{Float64}, minVal::Int64, maxVal::Int
         Y[i] = convert(Int64, round(Label[i]))
     end
     return Flux.onehotbatch(Y, minVal:maxVal)
-end
-
-# type I mechanism model 
-# single data point version
-function mechanism1(x::Vector{Float64}, 
-                    w::Vector{Float64},
-                    c::Float64,
-                    minVal::Int64,
-                    maxVal::Int64)
-    val = c + w'x
-    val = round(val)
-    val = min( max(val, minVal), maxVal)
-    return Flux.onehotbatch(val, minVal:maxVal)
-end
-# data batch version
-function mechanism1(x::Matrix{Float64}, 
-                    w::Vector{Float64},
-                    c::Float64,
-                    minVal::Int64,
-                    maxVal::Int64)
-    numData = size(x, 2)
-    out = map(i->mechanism1(x[:,i],w,c,minVal,maxVal), collect(1:numData))
-    return hcat(out...)
-end
-
-# type II mechanism model 
-# single data point version
-function mechanism2(x::Vector{Float64},
-                    l::Vector{Float64},
-                    u::Vector{Float64},
-                    d::Vector{Float64},
-                    minVal::Int64, 
-                    maxVal::Int64)
-    numClass = maxVal - minVal + 1
-    out = zeros(Float64, numClass)
-    if (x ≥ l) && (x ≤ u) # x ∈ X 
-        bound = 82.5263 - 80.26 * x[16] 
-        if d'x ≤ 50 # x ∈ H
-            bound = min(bound, 60)
-        end
-        bound = min( max(bound, minVal), maxVal)
-        bound = convert(Int64, round(bound))
-        idx = bound - minVal + 1
-        if idx < numClass
-            out = vcat( zeros(Float64, idx), -1e8*ones(Float64, numClass - idx))
-        else
-            out = zeros(Float64, numClass)
-        end
-    else
-        out = zeros(Float64, numClass)
-    end
-    return out
-end
-# data batch version
-function mechanism2(x::Matrix{Float64},
-                    l::Vector{Float64},
-                    u::Vector{Float64},
-                    d::Vector{Float64},
-                    minVal::Int64, 
-                    maxVal::Int64)
-    numData = size(x, 2)
-    out = map(i->mechanism2(x[:,i],l,u,d,minVal,maxVal), collect(1:numData))
-    return hcat(out...)
-end
-
-
-# Evaluation Metrics
-function r2_score(predict::Vector{Float64}, label::Vector{Float64})
-    v1 = 0
-    v2 = 0
-    y = mean(label)
-    for i = 1:length(predict)
-        v1 += (label[i] - predict[i])^2
-        v2 += (label[i] - y)^2
-    end
-    return 1 - (v1/v2)
-end
-
-function user_satisfication(predict::Vector{Float64}, label::Vector{Float64})
-    diff = predict - label
-    mape = abs.( diff ./ label)
-    ns = count( x->(x≤0.04), mape)
-    return ns / length(predict)
-end
-
-function getMetrics(predict::Vector{Float64}, label::Vector{Float64})
-    N = length(predict)
-    R2 = r2_score(predict, label)
-    MAE = L1dist(predict, label) / N
-    RMSE = sqrt( sqL2dist(predict, label) / N )
-    diff = predict - label
-    MAPE = mean( abs.(diff ./ label) )
-    PCCS = cor(predict, label)
-    US = user_satisfication(predict, label)
-    @printf "N: %d, R2: %.2f, MAE: %.2f, RMSE: %.2f, 1-MAPE: %.3f, PCCS: %.2f, US: %.2f\n" N R2 MAE RMSE 1-MAPE PCCS US 
-    return nothing
 end
 
 # read data from libsvm
@@ -231,7 +107,6 @@ function splitDataByClass(X::SparseMatrixCSC{Float64, Int64},
                           num_clients::Int64, 
                           num_classes::Int64,
                           num_classes_per_client::Int64)
-    Random.seed!(1234)
     Xsplit = Vector{ SparseMatrixCSC{Float64, Int64} }(undef, num_clients)
     Ysplit = Vector{ Vector{Int64} }(undef, num_clients)
     # assign num_classes_per_client classes to each client 
@@ -267,20 +142,28 @@ end
 
 function buildPredModel(X::SparseMatrixCSC{Float64, Int64}, Yhot::Flux.OneHotArray, numClass::Int64)
     # logistic regression with limited features
-    Random.seed!(1234)
     numFeatures = size(X, 1)
     numSelectedFeatures = floor(Int, 0.3*numFeatures)
     selectedFeatures = randperm(numFeatures)[1:numSelectedFeatures]
     mask = zeros(numFeatures); mask[selectedFeatures] .= 1.0
     model = Chain(Dense(numFeatures, numClass), softmax)
-    g(x) = model(x.*mask)
-    loss(x, y) = Flux.crossentropy( g(x) , y )
+    g0(x) = model(x.*mask)
+    loss(x, y) = Flux.crossentropy( g0(x) , y )
     data = Flux.Data.DataLoader( (X, Yhot), 
                                 batchsize=25, 
                                 shuffle=true )
     opt = ADAM()
-    for t = 1:10
+    for t = 1:5
         Flux.train!(loss, Flux.params(model), data, opt)
+    end
+    function g(x::SparseVector{Float64, Int64})
+        idx = argmax( g0(x) )
+        return Flux.onehot(idx, 1:numClass)
+    end
+    function g(x::SparseMatrixCSC{Float64, Int64})
+        num = size(x, 2)
+        out = map(i->g(x[:,i]), collect(1:num))
+        return hcat(out...)
     end
     return g
 end
@@ -288,14 +171,17 @@ end
 function buildRangeModel(X::SparseMatrixCSC{Float64, Int64}, 
                          Y::Vector{Int64}, 
                          numClass::Int64,
-                         numClassSub::Int64)
-    Random.seed!(1234)
+                         numClassSub::Int64,
+                         g::Function)
     DictData = Dict{SparseVector{Float64}, Vector{Float64}}()
     numData = size(X, 2)
     classes = collect(Set(Y))
     for i = 1:numData
         v = -1e8*ones(numClass)
-        v[Y[i]] = 0.0
+        trueLabel = Y[i]
+        v[trueLabel] = 0.0
+        predLabel = argmax(g(X[:,i]))
+        v[predLabel] = 0.0
         cs = sample( classes, numClassSub, replace=false )
         v[cs] .= 0.0
         DictData[X[:,i]] = v
@@ -354,23 +240,31 @@ function buildPredModelImg(X::Array{Float64, 4}, Yhot::Flux.OneHotArray)
     for t = 1:10
         Flux.train!(loss, Flux.params(model), data, opt)
     end
-    return model
+    function g(x::Array{Float64, 4})
+       idxs = [p[1] for p in argmax(model(x), dims=1)]
+       idxs = reshape(idxs, length(idxs))
+       return Flux.onehotbatch(idxs, 1:10)
+    end
 end           
               
 function buildRangeModelImg(X::Array{Float64, 4}, 
                             Y::Vector{Int64}, 
                             numClass::Int64,
-                            numClassSub::Int64)
+                            numClassSub::Int64,
+                            g::Function)
     DictData = Dict{Matrix{Float64}, Vector{Float64}}()
     numData = size(X, 4)
     classes = collect(Set(Y))
     for i = 1:numData
         v = -1e8*ones(numClass)
-        v[Y[i]+1] = 0.0
+        x = X[:,:,:,i:i]
+        trueLabel = Y[i]
+        v[trueLabel+1] = 0.0
+        predLabel = argmax(g(x))[1]
+        v[predLabel] = 0.0
         cs = sample( classes, numClassSub, replace=false )
         cs .+= 1
         v[cs] .= 0.0
-        x = X[:,:,:,i:i]
         DictData[MaxPool((2, 2))(x)[:,:,1,1]] = v
     end
     function h(x::Matrix{Float64})
@@ -395,7 +289,6 @@ function splitDataByClassImg(Xtrain::Array{Float64, 4},
                              num_clients::Int64, 
                              num_classes::Int64,
                              num_classes_per_client::Int64)
-    Random.seed!(1234)
     XtrainSplit = Vector{ Array{Float64, 4} }(undef, num_clients)
     YtrainSplit = Vector{ Vector{Int64} }(undef, num_clients)
     XtestSplit = Vector{ Array{Float64, 4} }(undef, num_clients)

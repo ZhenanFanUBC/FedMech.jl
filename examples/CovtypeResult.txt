@@ -1,106 +1,15 @@
-Performance	of the model with different percentage of the training data
-P = 1.0
-client: 1, test accuracy: 0.89
-client: 2, test accuracy: 0.95
-client: 3, test accuracy: 0.96
-client: 4, test accuracy: 0.97
-client: 5, test accuracy: 0.98
+############## Compare different approaches ##############
+parameters
+λ = 0.30, p = 0.01
 
-P = 0.9
-client: 1, test accuracy: 0.90
-client: 2, test accuracy: 0.95
-client: 3, test accuracy: 0.96
-client: 4, test accuracy: 0.96
-client: 5, test accuracy: 0.98
 
-P = 0.8
-client: 1, test accuracy: 0.89
-client: 2, test accuracy: 0.95
-client: 3, test accuracy: 0.95
-client: 4, test accuracy: 0.96
-client: 5, test accuracy: 0.98
 
-P = 0.7
-client: 1, test accuracy: 0.89
-client: 2, test accuracy: 0.95
-client: 3, test accuracy: 0.96
-client: 4, test accuracy: 0.96
-client: 5, test accuracy: 0.98
+############## Compare different p ##############
+parameters
+λ = 0.30
 
-P = 0.6
-client: 1, test accuracy: 0.88
-client: 2, test accuracy: 0.95
-client: 3, test accuracy: 0.96
-client: 4, test accuracy: 0.96
-client: 5, test accuracy: 0.98
 
-P = 0.5
-client: 1, test accuracy: 0.89
-client: 2, test accuracy: 0.95
-client: 3, test accuracy: 0.96
-client: 4, test accuracy: 0.96
-client: 5, test accuracy: 0.98
 
-P = 0.4
-client: 1, test accuracy: 0.87
-client: 2, test accuracy: 0.95
-client: 3, test accuracy: 0.95
-client: 4, test accuracy: 0.96
-client: 5, test accuracy: 0.98
-
-P = 0.3
-client: 1, test accuracy: 0.89
-client: 2, test accuracy: 0.95
-client: 3, test accuracy: 0.94
-client: 4, test accuracy: 0.96
-client: 5, test accuracy: 0.98
-
-P = 0.2
-client: 1, test accuracy: 0.88
-client: 2, test accuracy: 0.94
-client: 3, test accuracy: 0.94
-client: 4, test accuracy: 0.95
-client: 5, test accuracy: 0.98
-
-P = 0.1
-client: 1, test accuracy: 0.83
-client: 2, test accuracy: 0.94
-client: 3, test accuracy: 0.93
-client: 4, test accuracy: 0.94
-client: 5, test accuracy: 0.97
-
-P = 0.05
-client: 1, test accuracy: 0.78
-client: 2, test accuracy: 0.93
-client: 3, test accuracy: 0.94
-client: 4, test accuracy: 0.93
-client: 5, test accuracy: 0.97
-
-P = 0.01
-client: 1, test accuracy: 0.63
-client: 2, test accuracy: 0.88
-client: 3, test accuracy: 0.92
-client: 4, test accuracy: 0.92
-client: 5, test accuracy: 0.96
-
-Performance of the model with mechanism models but without federated learning (p = 0.01)
-client: 1, test accuracy: 0.49
-client: 2, test accuracy: 0.85
-client: 3, test accuracy: 0.92
-client: 4, test accuracy: 0.93
-client: 5, test accuracy: 0.96
-
-Performance of the model without mechanism models but with federated learning (p = 0.01)
-client: 1, test accuracy: 0.50
-client: 2, test accuracy: 0.85
-client: 3, test accuracy: 0.86
-client: 4, test accuracy: 0.88
-client: 5, test accuracy: 0.93
-
-Performance of the model without mechanism models and without federated learning (p = 0.01)
-client: 1, test accuracy: 0.41
-client: 2, test accuracy: 0.82
-client: 3, test accuracy: 0.86
-client: 4, test accuracy: 0.88
-client: 5, test accuracy: 0.93
-
+############## Compare different λ ##############
+parameters
+p = 0.01
