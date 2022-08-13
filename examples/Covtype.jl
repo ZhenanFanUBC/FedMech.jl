@@ -16,7 +16,7 @@ numClass = maximum(Y)
 Xsplit, Ysplit = splitDataByClass(X, Y, numClients, numClass, 5)
 # hyperparameters
 λ = 0.3
-p = 0.005
+p = 0.01
 @printf("λ = %.2f, p = %.3f\n", λ, p)
 
 # tag for whether using mechanism models
@@ -35,7 +35,7 @@ if withFed
     τ = 5
     server = Server(clients, τ)
     # @printf("Start federated learning process:\n")
-    training!(server, 1)
+    training!(server, 10)
 else
     for i = 1:numClients
         update!(clients[i], 10)
