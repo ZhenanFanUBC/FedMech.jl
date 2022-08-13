@@ -234,10 +234,10 @@ function buildPredModelImg(X::Array{Float64, 4}, Yhot::Flux.OneHotArray)
     model = LeNet5small()
     loss(x, y) = Flux.crossentropy( model(x) , y )
     data = Flux.Data.DataLoader( (X, Yhot), 
-                                batchsize=25, 
+                                batchsize=1000, 
                                 shuffle=true )
     opt = ADAM()
-    for t = 1:10
+    for t = 1:1
         Flux.train!(loss, Flux.params(model), data, opt)
     end
     function g(x::Array{Float64, 4})

@@ -3,7 +3,7 @@ using LinearAlgebra
 using MLDatasets
 import Random: seed!, randperm
 using Printf
-seed!(1234)
+seed!(9999)
 
 # load data
 Xtrain, Ytrain = MLDatasets.FashionMNIST(:train)[:]
@@ -21,7 +21,7 @@ numClass = 10
 # separate data to clients in non-iid fashion
 XtrainSplit, YtrainSplit, XtestSplit, YtestSplit = splitDataByClassImg(Xtrain, Ytrain, Xtest, Ytest, numClients, numClass, 6)
 # hyperparameters
-λ = 0.3
+λ = 0.5
 p = 0.01
 @printf("λ = %.2f, p = %.2f\n", λ, p)
 
@@ -64,10 +64,10 @@ for i = 1:numClients
     performance(clients[i])
 end
 
-@printf("performance for P-KM\n")
-for i = 1:numClients
-    performance(clients[i]; use_g=true)
-end
+# @printf("performance for P-KM\n")
+# for i = 1:numClients
+#     performance(clients[i]; use_g=true)
+# end
 
 
 

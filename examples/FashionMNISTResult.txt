@@ -1,0 +1,78 @@
+############## Compare different approaches ##############
+parameters
+λ = 0.30, p = 0.01
+
+performance for FLwKM
+client: 1, test accuracy: 0.88, percentage of violation: 0.00
+client: 2, test accuracy: 0.79, percentage of violation: 0.00
+client: 3, test accuracy: 0.84, percentage of violation: 0.00
+client: 4, test accuracy: 0.84, percentage of violation: 0.00
+client: 5, test accuracy: 0.89, percentage of violation: 0.00
+
+performance for MLwKM
+client: 1, test accuracy: 0.85, percentage of violation: 0.00
+client: 2, test accuracy: 0.69, percentage of violation: 0.00
+client: 3, test accuracy: 0.80, percentage of violation: 0.00
+client: 4, test accuracy: 0.76, percentage of violation: 0.00
+client: 5, test accuracy: 0.85, percentage of violation: 0.00
+
+performance for FL
+client: 1, test accuracy: 0.83, percentage of violation: 0.09
+client: 2, test accuracy: 0.74, percentage of violation: 0.12
+client: 3, test accuracy: 0.82, percentage of violation: 0.08
+client: 4, test accuracy: 0.76, percentage of violation: 0.12
+client: 5, test accuracy: 0.85, percentage of violation: 0.06
+
+performance for ML
+client: 1, test accuracy: 0.81, percentage of violation: 0.09
+client: 2, test accuracy: 0.66, percentage of violation: 0.15
+client: 3, test accuracy: 0.77, percentage of violation: 0.06
+client: 4, test accuracy: 0.70, percentage of violation: 0.08
+client: 5, test accuracy: 0.81, percentage of violation: 0.10
+
+performance for P-KM
+client: 1, test accuracy: 0.78, percentage of violation: 0.00
+client: 2, test accuracy: 0.59, percentage of violation: 0.00
+client: 3, test accuracy: 0.61, percentage of violation: 0.00
+client: 4, test accuracy: 0.65, percentage of violation: 0.00
+client: 5, test accuracy: 0.79, percentage of violation: 0.00
+
+
+
+############## Compare different p ##############
+parameters
+λ = 0.30
+
+p = 0.01
+performance for FLwKM
+client: 1, test accuracy: 0.88, percentage of violation: 0.00
+client: 2, test accuracy: 0.79, percentage of violation: 0.00
+client: 3, test accuracy: 0.84, percentage of violation: 0.00
+client: 4, test accuracy: 0.84, percentage of violation: 0.00
+client: 5, test accuracy: 0.89, percentage of violation: 0.00
+
+p = 0.05
+performance for FLwKM
+client: 1, test accuracy: 0.90, percentage of violation: 0.00
+client: 2, test accuracy: 0.87, percentage of violation: 0.00
+client: 3, test accuracy: 0.90, percentage of violation: 0.00
+client: 4, test accuracy: 0.89, percentage of violation: 0.00
+client: 5, test accuracy: 0.91, percentage of violation: 0.00
+
+p = 0.10
+performance for FLwKM
+client: 1, test accuracy: 0.92, percentage of violation: 0.00
+client: 2, test accuracy: 0.87, percentage of violation: 0.00
+client: 3, test accuracy: 0.90, percentage of violation: 0.00
+client: 4, test accuracy: 0.91, percentage of violation: 0.00
+client: 5, test accuracy: 0.92, percentage of violation: 0.00
+
+p = 0.30
+performance for FLwKM
+client: 1, test accuracy: 0.94, percentage of violation: 0.00
+client: 2, test accuracy: 0.90, percentage of violation: 0.00
+client: 3, test accuracy: 0.94, percentage of violation: 0.00
+client: 4, test accuracy: 0.93, percentage of violation: 0.00
+client: 5, test accuracy: 0.95, percentage of violation: 0.00
+
+
