@@ -38,7 +38,7 @@ if withFed
     training!(server, 10)
 else
     for i = 1:numClients
-        update!(clients[i], 10)
+        update!(clients[i], numEpoches=10)
     end
 end
 

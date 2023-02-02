@@ -24,3 +24,4 @@ docs/site/
 Manifest.toml
 data/.DS_Store
 .DS_Store
+.vscode
