@@ -20,7 +20,7 @@ export getMetrics, r2_score
 export Client, ClientImg, update!, performance, performance_2 
 export Server, select!, sendModel!, aggregate!, training!
 
-device =gpu #  cpu # 
+device = cpu # Switch to gpu for cifar10, if want to accelerate training with gpu. 
 
 include("utils.jl")
 include("client.jl")
