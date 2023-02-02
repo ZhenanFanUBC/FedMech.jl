@@ -1,3 +1,4 @@
+
 mutable struct Server{  T1<:Flux.Chain, 
                         T2<:Vector{Union{Client,ClientImg}},
                         T3<:Vector{Int64},
@@ -7,7 +8,7 @@ mutable struct Server{  T1<:Flux.Chain,
     selectedIndices::T3     # indices of selected clients 
     τ::T4                   # number of selected cients
     function Server(clients::Vector{Union{Client,ClientImg}}, τ::Int64)
-        W = deepcopy( clients[1].W )
+        W = deepcopy( clients[1].W ) |> device 
         selectedIndices = Vector{Int64}(undef, τ)
         new{Flux.Chain, Vector{Union{Client,ClientImg}}, Vector{Int64}, Int64}(W, clients, selectedIndices, τ)
     end
@@ -22,8 +23,9 @@ function sendModel!(s::Server)
     for i in s.selectedIndices
         c = s.clients[i]
         for j = 1:length(Flux.params(s.W))
-            Flux.params(c.W)[j] .= deepcopy( Flux.params(s.W)[j] )
+            Flux.params(c.W)[j] .= deepcopy( Flux.params(s.W)[j] ) 
         end
+        c.W = c.W |> device 
     end
 end
 
@@ -35,13 +37,17 @@ function aggregate!(s::Server)
     for i in s.selectedIndices
         c = s.clients[i]
         for j = 1:l
-            Flux.params(s.W)[j] .+= (1/s.τ) * deepcopy( Flux.params(c.W)[j] )
+            Flux.params(s.W)[j] .+= (1/s.τ) * Flux.params(c.W)[j]
         end
     end
+    s.W=s.W |> device
 end
 
+using ParameterSchedulers
+
 function training!(s::Server, T::Int64)
-    for t = 1:T
+    shc = CosAnneal(λ0 = 0.0, λ1 = 1e-1, period = T)
+    for (eta, t) in zip(shc, 1:T)
         # @printf "round: %d\n" t
         # select clients
         select!(s)
@@ -50,11 +56,12 @@ function training!(s::Server, T::Int64)
         # local update for selected clients
         lss = 0.0
         for i in s.selectedIndices
+            # @printf "select: %d\n" i
             c = s.clients[i]
-            local_lss = update!(c)
+            local_lss = update!(c, eta=eta)
             lss += local_lss
         end
-        # @printf "global loss: %.2f\n" lss
+        # @printf "global loss: %.2f\n" lss 
         # global aggregation
         aggregate!(s)
     end
