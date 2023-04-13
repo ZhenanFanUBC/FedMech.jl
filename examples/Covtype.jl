@@ -4,6 +4,11 @@ using SparseArrays
 using Flux
 import Random: seed!, randperm
 using Printf
+device=cpu
+# dataPath = "data/covtype" ## dataPath = "data/rcv1" 
+# dataPath = "data/sector-scale"  
+# dataPath = "data/Sensorless.scale" 
+
 function main(λ, p, withMech, withFed; numClients=5, numClassPerClient=5, dataPath="data/covtype", verbose=true)
     seed!(9999)
     # load data
@@ -20,7 +25,7 @@ function main(λ, p, withMech, withFed; numClients=5, numClassPerClient=5, dataP
         clients[i] = Client(i, Xsplit[i], Ysplit[i], numClass, λ, p, withMech; withAdap=withFed == 3)
     end
 
-    # initialize server
+    # initialize se
     if withFed != 0
         τ = 5
         server = Server(clients, τ)

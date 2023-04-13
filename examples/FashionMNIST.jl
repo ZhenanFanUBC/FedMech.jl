@@ -6,7 +6,7 @@ using Printf
 import Zygote: dropgrad
 using CUDA, Flux
 import StatsBase: sample
-
+device = gpu
 function main(λ, p, withMech, withFed; numClients=5, verbose=true)
 
     seed!(9999)
