@@ -20,6 +20,12 @@ Steps to run the experiments
 - `include("examples/Cifar10.jl")`
 - Then call the main function, e.g., `main(0.3, 0.01, true, 1)`. 
 
+## Covtype/Sensorless/Sector 
+
+Steps to run the experiments
+- Download correspoding dataset to data/ folder. 
+- When calling the main function, add additional argument `dataPath`, e.g., `main(0.3, 0.01, true, 1; dataPath="data/covtype")`
+
 ## Regression 
 
 Steps to run the experiments
