@@ -44,8 +44,7 @@ function aggregate!(s::Server)
 end
 
 using ParameterSchedulers
-
-function training!(s::Server, T::Int64)
+function training!(s::Server, T::Int64; with_proximal_term=false, numEpoches=5)
     shc = CosAnneal(λ0 = 0.0, λ1 = 1e-1, period = T)
     for (eta, t) in zip(shc, 1:T)
         # @printf "round: %d\n" t
@@ -58,7 +57,7 @@ function training!(s::Server, T::Int64)
         for i in s.selectedIndices
             # @printf "select: %d\n" i
             c = s.clients[i]
-            local_lss = update!(c, eta=eta)
+            local_lss = update!(c; eta=eta, with_proximal_term=with_proximal_term, numEpoches=numEpoches)
             lss += local_lss
         end
         # @printf "global loss: %.2f\n" lss 

@@ -19,8 +19,8 @@ function discretize(Ycont, nbin=19)
 end
 function main(λ=0.3, p=0.3, withMech=true, withFed=true)
     # load data
-    run(`sed -i -e 's/  / /g' data/YearPredictionMSD`) 
-    X, Ycont = read_libsvm("data/YearPredictionMSD-proc", "regression")
+    run(`sed -i -e 's/  / /g' data/YearPredictionMSD`)
+    X, Ycont = read_libsvm("data/YearPredictionMSD", "regression")
     # X, Ycont = read_libsvm("data/housing_scale.txt", "regression") 
     lookup = Dict()
     for i in 1:length(Ycont)

@@ -1,28 +1,25 @@
 # client for general classification dataset
-mutable struct Client{T1<:Int64,
-    T2<:Float32,
-    T3<:Vector{T1},
-    T4<:SparseMatrixCSC{T2,T1},
-    T5<:Flux.OneHotArray,
-    T6<:Flux.Chain,
-    T7<:Function}
-    id::T1                  # client index
-    Xtrain::T4              # training data
-    Ytrain::T3              # training label
-    YtrainHot::T5           # transformed training label
-    Xtest::T4               # test data
-    Ytest::T3               # test label
-    W::T6                   # model  
-    g::T7                   # prediction-type knowledge model
-    h::T7                   # range-type knowledge model   
-    f::T7                   # personalized model
+mutable struct Client
+    id::Int64                          # client index
+    Xtrain::SparseMatrixCSC{Float32,Int64}   # training data
+    Ytrain::Vector{Int64}              # training label
+    YtrainHot::Flux.OneHotArray{UInt32} # transformed training label
+    Xtest::SparseMatrixCSC{Float32,Int64}    # test data
+    Ytest::Vector{Int64}               # test label
+    W::Flux.Chain                      # model  
+    V::Flux.Chain                      # model V 
+    g::Function                        # prediction-type knowledge model
+    h::Function                        # range-type knowledge model   
+    f::Function                        # personalized model
     function Client(id::Int64,
         X::SparseMatrixCSC{Float32,Int64},
         Y::Vector{Int64},
         numClass::Int64,
         λ::Float64,
         p::Float64,
-        withMech::Bool)
+        withMech::Bool;
+        withAdap::Bool = false
+        )
         # split train and test
         Xtrain, Ytrain, Xtest, Ytest = train_test_split(X, Y, 0.1)
         # label transformation
@@ -36,7 +33,15 @@ mutable struct Client{T1<:Int64,
         dim2 = 128
         W = Chain(Dense(numFeature, dim1, relu),
             Dense(dim1, dim2, relu),
-            Dense(dim2, numClass))
+                    Dense(dim2, numClass)) |> device 
+        if !withAdap 
+            WV = V = W 
+        else
+            V = Chain(Dense(numFeature, dim1, relu),
+                        Dense(dim1, dim2, relu),
+                        Dense(dim2, numClass)) |> device 
+            WV = x -> 0.5*W(x)+0.5*V(x) 
+        end
         # use only subset of training data
         num = size(Xtrain, 2)
         numTrain = Int(floor(p * num))
@@ -44,33 +49,28 @@ mutable struct Client{T1<:Int64,
         Idx = perm[1:numTrain]
         # personalized model
         if withMech
-            f = x -> (1 - λ) * NNlib.softmax(W(x) + h(x)) + λ * g(x)
+            f = x -> (1 - λ) * NNlib.softmax(WV(x) + (h(x))) + λ * (g(x))
         else
             f = x -> NNlib.softmax(W(x))
         end
-        new{Int64,Float32,Vector{Int64},SparseMatrixCSC{Float32,Int64},Flux.OneHotArray,Flux.Chain,Function}(id, Xtrain[:, Idx], Ytrain[Idx], YtrainHot[:, Idx], Xtest, Ytest, W, g, h, f)
+        new(id, Xtrain[:, Idx], Ytrain[Idx], YtrainHot[:, Idx], Xtest, Ytest, W, V, g, h, f)
     end
 end
 
 import Zygote: dropgrad
 # client for image classification dataset
-mutable struct ClientImg{T1<:Int64,
-    T2<:Float32,
-    T3<:Vector{T1},
-    T4<:Array{Float32,4},
-    T5<:Flux.OneHotArray,
-    T6<:Flux.Chain,
-    T7<:Function}
-    id::T1                  # client index
-    Xtrain::T4              # training data
-    Ytrain::T3              # training label
-    YtrainHot::T5           # transformed training label
-    Xtest::T4               # test data
-    Ytest::T3               # test label
-    W::T6                   # model                 
-    g::T7                   # prediction-type knowledge model
-    h::T7                   # range-type knowledge model   
-    f::T7                   # personalized model
+mutable struct ClientImg
+    id::Int64                  # client index
+    Xtrain::Array{Float32, 4}  # training data
+    Ytrain::Vector{Int64}      # training label
+    YtrainHot::Flux.OneHotArray{UInt32}  # transformed training label
+    Xtest::Array{Float32, 4}   # test data
+    Ytest::Vector{Int64}       # test label
+    W::Flux.Chain              # model        
+    V::Flux.Chain              # model V          
+    g::Function                # prediction-type knowledge model
+    h::Function                # range-type knowledge model   
+    f::Function                # personalized model
     function ClientImg(id::Int64,
         Xtrain::Array{Float32,4},
         Ytrain::Vector{Int64},
@@ -79,7 +79,8 @@ mutable struct ClientImg{T1<:Int64,
         numClass::Int64,
         λ::Float64,
         p::Float64,
-        withMech::Bool)
+        withMech::Bool;
+        withAdap::Bool = false) 
         # label transformation
         YtrainHot = Flux.onehotbatch(Ytrain, 0:9)
         is_cifar = size(Xtrain, 3) == 3
@@ -93,6 +94,17 @@ mutable struct ClientImg{T1<:Int64,
             W = MyModel(large=true)
         end
         W = W |> device
+        if !withAdap
+            WV=V = W
+        else
+            if !is_cifar
+                V = LeNet5()
+            else
+                V = MyModel(large=true)
+            end
+            V = V |> device 
+            WV = x -> 0.5*W(x)+0.5*V(x) 
+        end
         # use only subset of training data
         num = size(Xtrain, 4)
         numTrain = Int(floor(p * num))
@@ -100,25 +112,50 @@ mutable struct ClientImg{T1<:Int64,
         Idx = perm[1:numTrain]
         # model with mechanisms
         if withMech
-            f = x -> (1 - λ) * NNlib.softmax(W(x) + dropgrad(h(x))) + λ * dropgrad(g(x))
+            f = x -> (1 - λ) * NNlib.softmax(WV(x) + dropgrad(h(x))) + λ * dropgrad(g(x))
         else
-            f = x -> NNlib.softmax(W(x))
+            f = x -> NNlib.softmax(WV(x))
         end
-        new{Int64,Float32,Vector{Int64},Array{Float32,4},Flux.OneHotArray,Flux.Chain,Function}(id, Xtrain[:, :, :, Idx], Ytrain[Idx], YtrainHot[:, Idx], Xtest, Ytest, W, g, h, f)
+        new(id, Xtrain[:, :, :, Idx], Ytrain[Idx], YtrainHot[:, Idx], Xtest, Ytest, W, V, g, h, f)
     end
 end
 
 using MLUtils: mapobs
-
-function update!(c::Union{Client,ClientImg}; numEpoches::Int64=5, eta=0.1) # todo caller need to be changed accordingly 
-    data = Flux.DataLoader(
-        mapobs(device, (c.Xtrain, c.YtrainHot)), batchsize=32, shuffle=true)
-    loss(x, y) = Flux.crossentropy(c.f(x), y)
-    opt = Flux.Optimise.Optimiser(WeightDecay(5.0f-4), Adam())
-    # opt = Flux.Optimise.Optimiser(WeightDecay(5f-4), Momentum(eta, 0.9)) 
+l2(x::AbstractArray) = sum(abs2, x)
+function update!(c::Union{Client,ClientImg}; numEpoches::Int64=5, eta=0.1, with_proximal_term=false) 
+    # opt = Flux.Optimise.Optimiser(WeightDecay(5.0f-4), Adam())
+    opt = Flux.Optimise.Optimiser(WeightDecay(5f-4), Momentum(eta, 0.9)) 
+    if c.V===c.W # no adaptive 
+        starting_point=(dropgrad(deepcopy(Flux.params(c.W))))
+        data = Flux.DataLoader(mapobs(device, (c.Xtrain, c.YtrainHot)), batchsize=32, shuffle=true) 
+        function loss_with_proximal(x, y) 
+            i=1; pen=(0.);
+            for i in 1:length(Flux.params(c.W)) 
+                pen = pen + l2(Flux.params(c.W)[i] - starting_point[i]) 
+            end 
+            res=Flux.crossentropy(c.f(x), y)
+            # println("loss " * string(res) * " pen " * string(pen) * "\n")
+            return  res + 1e-3 * pen 
+        end
+        loss_without_proximal(x,y) = Flux.crossentropy(c.f(x), y) 
+        if with_proximal_term
+            # @printf "client: %d, with proximal term\n" c.id
+            loss = loss_with_proximal
+        else
+            loss = loss_without_proximal
+        end
     for t = 1:numEpoches
         Flux.train!(loss, Flux.params(c.W), data, opt)
-        # callback!( (c, t) )
+        end
+    else # with adap 
+        data = Flux.DataLoader(mapobs(device, (c.Xtrain, c.YtrainHot)), batchsize=32, shuffle=true) 
+        loss(x,y) = Flux.crossentropy(c.f(x), y) 
+        for t = 1:numEpoches
+            Flux.train!(loss, union(
+                                    Flux.params(c.W), 
+                                    Flux.params(c.V)
+                                    ), data, opt) 
+        end
     end
     lss = -1.0
     # lss = loss(c.Xtrain |> device, c.YtrainHot |> device ) # todo batchlize it 
@@ -126,8 +163,7 @@ function update!(c::Union{Client,ClientImg}; numEpoches::Int64=5, eta=0.1) # tod
     return lss
 end
 
-
-function performance(c::Client; use_g::Bool=false)
+function performance(c::Client; use_g::Bool=false, verbose=true)
     numPred = 0
     numVio = 0
     numTest = size(c.Xtest, 2)
@@ -146,11 +182,15 @@ function performance(c::Client; use_g::Bool=false)
             numVio += 1
         end
     end
-    @printf "client: %d, test accuracy: %.2f, percentage of violation: %.2f\n" c.id numPred / numTest numVio / numTest
+    acc, pov = (numPred / numTest), (numVio / numTest)
+    if verbose 
+        @printf "client: %d, test accuracy: %.2f, percentage of violation: %.2f\n" c.id acc pov 
+    end
+    return acc, pov 
 end
 
 import StatsBase: rmsd
-function performance(c::Client, lookup::Dict{Any,Any}, mpbk::Any; use_g::Bool=false)
+function performance(c::Client, lookup::Dict{Any,Any}, mpbk::Any; use_g::Bool=false, verbose=true)
     preds=Float32[] 
     gts=Float32[]
     numVio = 0
@@ -172,7 +212,7 @@ function performance(c::Client, lookup::Dict{Any,Any}, mpbk::Any; use_g::Bool=fa
     @printf "client: %d, test rmse: %.2f, percentage of violation: %.2f\n" c.id rmsd(preds, gts) numVio / numTest
 end
 
-function performance(c::ClientImg; use_g::Bool=false, eval_on_test::Bool=true)
+function performance(c::ClientImg; use_g::Bool=false, eval_on_test::Bool=true, verbose=true) 
     numPred = 0
     numVio = 0
     if eval_on_test
@@ -199,7 +239,11 @@ function performance(c::ClientImg; use_g::Bool=false, eval_on_test::Bool=true)
             # break  
         end
     end
-    @printf "client: %d, test accuracy: %.2f, percentage of violation: %.2f\n" c.id numPred / numTest numVio / numTest
+    acc, pov = (numPred / numTest), (numVio / numTest)
+    if verbose 
+        @printf "client: %d, test accuracy: %.2f, percentage of violation: %.2f\n" c.id acc pov 
+    end
+    return acc, pov
 end
 
 function performance_2(func, X, Y)

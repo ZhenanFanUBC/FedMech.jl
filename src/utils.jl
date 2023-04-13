@@ -61,7 +61,7 @@ function read_libsvm(filename::String, tag::String="classification")
             end
         end
     end
-    @printf("number of lines: %i\n", numLine)
+    # @printf("number of lines: %i\n", numLine)
     n = numLine
     m = 0
     I = zeros(Int64, nnz)
@@ -123,7 +123,7 @@ function splitDataByClass(X::SparseMatrixCSC{Float32,Int64},
         classes = sample(1:num_classes, num_classes_per_client, replace=false)
         classes_clients[i] = classes
     end
-    # clients in each class # possible that a class not covered by any class
+    # clients in each class # possible that a class not covered by any client
     clients_in_classes = [[] for _ = 1:num_classes]
     for i = 1:num_classes
         for j = 1:num_clients
@@ -139,11 +139,11 @@ function splitDataByClass(X::SparseMatrixCSC{Float32,Int64},
         j = rand(clients_in_classes[class])
         push!(indices[j], i)
     end
-    # fill in
+    # fill in data
     for i in 1:num_clients
         ids = indices[i]
         Xsplit[i] = copy(X[:, ids])
-        Ysplit[i] = Y[ids]
+        Ysplit[i] = copy(Y[ids])
     end
     return Xsplit, Ysplit
 end
@@ -158,13 +158,17 @@ function buildPredModel(X::SparseMatrixCSC{Float32,Int64}, Yhot::Flux.OneHotArra
     model = Chain(Dense(numFeatures, numClass), softmax)
     g0(x) = model(x .* mask)
     loss(x, y) = Flux.crossentropy(g0(x), y)
-    data = Flux.Data.DataLoader((X, Yhot),
-        batchsize=32,
-        shuffle=true)
-    opt = Adam()
-    for t = 1:50
-        Flux.train!(loss, Flux.params(model), data, opt)
+    batchsize=32
+    nsamples = size(X,2); 
+    if nsamples < batchsize 
+        batchsize=nsamples; #println("warn bs 32 -> ", nsamples) 
     end
+    # limited_data_idxs = randperm(nsamples)[1:(nsamples÷10)]
+    data = Flux.Data.DataLoader((X, Yhot), # [:,limited_data_idxs]
+                                batchsize=batchsize,
+                                shuffle=true)
+    opt = Descent()
+        Flux.train!(loss, Flux.params(model), data, opt)
     function g(x::SparseVector{Float32,Int64})
         idx = argmax(g0(x))
         return Flux.onehot(idx, 1:numClass)
@@ -237,65 +241,6 @@ function LeNet5small(; imgsize=(14, 14, 1), nclasses=10) # actually accept 28x28
     )
 end
 
-function MyModel_v1(;large=true, imgsize=(32,32,3), nclasses=10) # imgsize always 32,32
-    layers=[] 
-    if large
-        append!(layers, [Conv((3, 3), 3 => 64, relu, pad=(1, 1), stride=(1, 1)),
-                        BatchNorm(64),
-                        Conv((3, 3), 64 => 64, relu, pad=(1, 1), stride=(1, 1)),
-                        BatchNorm(64),
-                        MaxPool((2,2)),
-                            ] ) 
-    else 
-        append!(layers, [
-                        MaxPool((2,2)),
-                        Conv((3, 3), 3 => 64, relu, pad=(1, 1), stride=(1, 1)),
-                        ]) 
-    end
-    append!(layers,     
-        [Conv((3, 3), 64 => 128, relu, pad=(1, 1), stride=(1, 1)),
-            BatchNorm(128),
-            Conv((3, 3), 128 => 128, relu, pad=(1, 1), stride=(1, 1)),
-            BatchNorm(128),     
-            MaxPool((2,2)),
-            Conv((3, 3), 128 => 256, relu, pad=(1, 1), stride=(1, 1)),
-            BatchNorm(256),
-            Conv((3, 3), 256 => 256, relu, pad=(1, 1), stride=(1, 1)),
-            BatchNorm(256),
-            Conv((3, 3), 256 => 256, relu, pad=(1, 1), stride=(1, 1)),
-            BatchNorm(256),
-            MaxPool((2,2)),
-            Conv((3, 3), 256 => 512, relu, pad=(1, 1), stride=(1, 1)),
-            BatchNorm(512),
-            Conv((3, 3), 512 => 512, relu, pad=(1, 1), stride=(1, 1)),
-            BatchNorm(512),
-            Conv((3, 3), 512 => 512, relu, pad=(1, 1), stride=(1, 1)),
-            BatchNorm(512),
-            MaxPool((2,2)),
-            Conv((3, 3), 512 => 512, relu, pad=(1, 1), stride=(1, 1)),
-            BatchNorm(512),
-            Conv((3, 3), 512 => 512, relu, pad=(1, 1), stride=(1, 1)),
-            BatchNorm(512),
-            Conv((3, 3), 512 => 512, relu, pad=(1, 1), stride=(1, 1)),
-            BatchNorm(512),
-            MaxPool((2,2)),
-            Flux.flatten,
-            Dense(512, 4096, relu),
-            Dropout(0.5),
-            Dense(4096, 4096, relu),
-            Dropout(0.5),
-            Dense(4096, nclasses)
-        ] ) 
-    if !large
-        push!(layers, 
-            NNlib.softmax
-        )
-    end 
-    m=Chain(layers)
-    Flux.trainmode!(m)
-    return m 
-end
-
 using NNlib, Metalhead, MLUtils
 
 function MyModel(; large=true)
@@ -323,7 +268,7 @@ function MyModel(; large=true)
 end
 
 using MLUtils: mapobs
-function buildPredModelImg(X::Array{Float32,4}, Yhot::Flux.OneHotArray; epochs=1) # 1  
+function buildPredModelImg(X::Array{Float32,4}, Yhot::Flux.OneHotArray; epochs=2) 
     is_cifar=size(X, 3)==3 
     if !is_cifar 
         # @printf("not cifar")
@@ -335,6 +280,10 @@ function buildPredModelImg(X::Array{Float32,4}, Yhot::Flux.OneHotArray; epochs=1
     end
     model = model |> device 
     loss(x, y) = Flux.crossentropy(model(x), y)
+    nsamples = size(X,2); 
+    if nsamples < batchsize 
+        batchsize=nsamples; #println("warn bs 32 -> ", nsamples) 
+    end
     data = Flux.DataLoader(
         mapobs(device, (X, Yhot)),
         batchsize=batchsize, 
@@ -346,7 +295,7 @@ function buildPredModelImg(X::Array{Float32,4}, Yhot::Flux.OneHotArray; epochs=1
     end
     Flux.testmode!(model) 
     # @printf("a prediction model built, train acc: "); performance_2(model, X, Flux.onecold(Yhot, 0:9)) 
-    @printf("a prediction model built\n") 
+    # @printf("a prediction model built\n") 
     function g(x::Array{Float32,4})
         x = x |> device 
         idxs = [p[1] for p in argmax(cpu(model(x)), dims=1)]
@@ -448,7 +397,7 @@ function splitDataByClassImg(Xtrain::Array{Float32,4},
         j = rand(clients_in_classes[class])
         push!(testIndices[j], i)
     end
-    # fill in
+    # fill in data
     for i in 1:num_clients
         ids1 = trainIndices[i]
         ids2 = testIndices[i]
@@ -459,3 +408,37 @@ function splitDataByClassImg(Xtrain::Array{Float32,4},
     end
     return XtrainSplit, YtrainSplit, XtestSplit, YtestSplit
 end
+
+function show_name(withMech, withFed)
+    if withMech == false && withFed == 0
+        # ML
+        println("ML")
+    elseif withMech == true && withFed == 0
+        # MLwKM
+        println("MLwKM")
+    elseif withMech == false && withFed == 1
+        # FL
+        println("FL")
+    elseif withMech == true && withFed == 1
+        # FLwKM
+        println("FLwKM")
+    elseif withMech == false && withFed == 2
+        # AD
+        println("ADAP")
+    elseif withMech == true && withFed == 2
+        # ADwKM
+        println("ADAPwKM")
+    elseif withMech == false && withFed == 3
+        # with proximal term (ditto)
+        println("DITTO")
+    elseif withMech == true && withFed == 3
+        println("DITTOwKM")
+    end
+end
+
+function mean_plusminus_std(data)
+    μ = mean(data)
+    delta = std(data)
+    return     string(@sprintf("%.2f", μ), "±", @sprintf("%.2f", delta))
+end
+

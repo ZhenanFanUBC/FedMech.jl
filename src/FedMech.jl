@@ -2,13 +2,21 @@ module FedMech
 
 using LinearAlgebra
 using Flux
-using Zygote
 using Printf
 using Statistics
 using StatsBase
 using Random
 using SparseArrays
 using CUDA
+using Revise 
+using Dates#, Logging LoggingExtras, 
+using MLDatasets
+import Random: seed!, randperm
+import StatsBase: sample
+const date_format = "mm-dd HH:MM:SS"
+timestamp_logger(logger) = TransformerLogger(logger) do log
+  merge(log, (; message = "$(Dates.format(now(), date_format)) $(log.message)"))
+end
 
 export load_data, read_libsvm, train_test_split, splitDataByClass, split_data, splitDataByClassImg
 export label_transformation
@@ -20,10 +28,10 @@ export getMetrics, r2_score
 export Client, ClientImg, update!, performance, performance_2 
 export Server, select!, sendModel!, aggregate!, training!
 
-device = cpu # Switch to gpu for cifar10, if want to accelerate training with gpu. 
-
+CUDA.allowscalar(true) 
+device=cpu 
 include("utils.jl")
-include("client.jl")
+include("my_client.jl")
 include("server.jl")
 
 end
